@@ -5,6 +5,15 @@ const Ctx=createContext<any>(null);export const useApp=()=>useContext(Ctx)
 const ls=(k:string,d:any)=>{try{return JSON.parse(localStorage.getItem(k)||'')||d}catch{return d}}
 export function Art({s,cls=''}:{s?:Song;cls?:string}){return s?.artwork_url?<img src={s.artwork_url} alt="" className={`object-cover ${cls}`}/>:
 <div className={`flex items-center justify-center font-serif text-4xl text-amber-200/80 bg-gradient-to-br from-[#6b3a22] via-[#3a1f16] to-[#1c1210] ${cls}`}>{(s?.title||'V')[0]}</div>}
+const Btn=({on,children,c=''}:any)=><button onClick={on} className={`w-10 h-10 rounded-full hover:bg-white/10 ${c}`}>{children}</button>
+function Controls(){const {toggle,playing,prev,next,shuffle,setShuffle,repeat,setRepeat}=useApp()
+ return <div className="flex items-center justify-center gap-1">
+  <Btn on={()=>setShuffle(!shuffle)} c={shuffle?'text-amber-400':''}>⇄</Btn><Btn on={prev}>⏮</Btn>
+  <button onClick={toggle} className="btn !w-12 !h-12 !p-0">{playing?'❚❚':'▶'}</button><Btn on={next}>⏭</Btn>
+  <Btn on={()=>setRepeat(!repeat)} c={repeat?'text-amber-400':''}>↻</Btn></div>}
+function Seek(){const {a,t,dur}=useApp()
+ return <div className="flex items-center gap-2 text-xs text-white/60"><span>{fmt(t)}</span>
+  <input type="range" min={0} max={dur||0} step={0.1} value={t} onChange={e=>{if(a.current)a.current.currentTime=+e.target.value}} className="flex-1"/><span>{fmt(dur)}</span></div>}
 export function Provider({children}:any){
  const [songs,setSongs]=useState<Song[]>([]),[loaded,setLoaded]=useState(false)
  const [queue,setQueue]=useState<Song[]>([]),[cur,setCur]=useState<Song|null>(null)
@@ -14,26 +23,19 @@ export function Provider({children}:any){
  const a=useRef<HTMLAudioElement>(null)
  const reload=useCallback(async()=>{const {data}=await sb.from('songs').select('*').order('created_at');setSongs(data||[]);setLoaded(true)},[])
  useEffect(()=>{reload();setFavs(ls('favs',[]));setRecent(ls('recent',[]))},[reload])
- const play=(s:Song,list?:Song[])=>{if(cur?.id===s.id&&a.current){a.current.paused?a.current.play():a.current.pause();return}
-  if(list)setQueue(list);else if(!queue.length)setQueue(songs);setCur(s)
-  const r=[s.id,...recent.filter(i=>i!==s.id)].slice(0,10);setRecent(r);localStorage.setItem('recent',JSON.stringify(r))}
- useEffect(()=>{if(cur&&a.current&&cur.audio_url){a.current.src=cur.audio_url;a.current.play().catch(()=>{})}},[cur?.id])
+ const start=(s:Song)=>{const e=a.current;if(e&&s.audio_url){if(cur?.id!==s.id)e.src=s.audio_url;e.currentTime=0;e.play().catch(()=>{})}
+  setCur(s);const r=[s.id,...recent.filter(i=>i!==s.id)].slice(0,10);setRecent(r);localStorage.setItem('recent',JSON.stringify(r))}
+ const toggle=()=>{const e=a.current;if(!e||!cur)return;if(e.paused)e.play().catch(()=>{});else e.pause()}
+ const play=(s:Song,list?:Song[])=>{if(cur?.id===s.id){toggle();return}
+  if(list)setQueue(list);else if(!queue.length)setQueue(songs);start(s)}
  const step=(d:number)=>{if(!queue.length||!cur)return;const i=queue.findIndex(x=>x.id===cur.id)
-  const n=shuffle&&queue.length>1?queue.filter(x=>x.id!==cur.id)[Math.floor(Math.random()*(queue.length-1))]:queue[(i+d+queue.length)%queue.length];setQueue(queue);setCur(n)}
- const toggle=()=>{const e=a.current;if(!e||!cur)return;e.paused?e.play():e.pause()}
+  start(shuffle&&queue.length>1?queue.filter(x=>x.id!==cur.id)[Math.floor(Math.random()*(queue.length-1))]:queue[(i+d+queue.length)%queue.length])}
  const fav=(id:string)=>{const f=favs.includes(id)?favs.filter(i=>i!==id):[...favs,id];setFavs(f);localStorage.setItem('favs',JSON.stringify(f))}
  useEffect(()=>{if(a.current){a.current.volume=vol;a.current.muted=muted}},[vol,muted])
- const v={songs,loaded,reload,play,fav,favs,recent,cur,playing,toggle,next:()=>step(1),prev:()=>step(-1),shuffle,setShuffle,repeat,setRepeat,queue}
- const Btn=({on,children,c=''}:any)=><button onClick={on} className={`w-10 h-10 rounded-full hover:bg-white/10 ${c}`}>{children}</button>
- const Controls=()=><div className="flex items-center justify-center gap-1">
-  <Btn on={()=>setShuffle(!shuffle)} c={shuffle?'text-amber-400':''}>⇄</Btn><Btn on={v.prev}>⏮</Btn>
-  <button onClick={toggle} className="btn !w-12 !h-12 !p-0">{playing?'❚❚':'▶'}</button><Btn on={v.next}>⏭</Btn>
-  <Btn on={()=>setRepeat(!repeat)} c={repeat?'text-amber-400':''}>↻</Btn></div>
- const Seek=()=><div className="flex items-center gap-2 text-xs text-white/60"><span>{fmt(t)}</span>
-  <input type="range" min={0} max={dur||0} step={0.1} value={t} onChange={e=>{a.current!.currentTime=+e.target.value}} className="flex-1"/><span>{fmt(dur)}</span></div>
+ const v={songs,loaded,reload,play,fav,favs,recent,cur,playing,toggle,next:()=>step(1),prev:()=>step(-1),shuffle,setShuffle,repeat,setRepeat,queue,a,t,dur}
  return <Ctx.Provider value={v}>{children}
- <audio ref={a} onPlay={()=>setPlaying(true)} onPause={()=>setPlaying(false)} onTimeUpdate={e=>setT(e.currentTarget.currentTime)}
-  onLoadedMetadata={e=>setDur(e.currentTarget.duration)} onEnded={()=>repeat?(a.current!.currentTime=0,a.current!.play()):v.next()}/>
+ <audio ref={a} preload="metadata" onPlay={()=>setPlaying(true)} onPause={()=>setPlaying(false)} onTimeUpdate={e=>setT(e.currentTarget.currentTime)}
+  onLoadedMetadata={e=>setDur(e.currentTarget.duration)} onEnded={()=>{if(repeat){a.current!.currentTime=0;a.current!.play()}else step(1)}}/>
  {cur&&!open&&<div className="fixed bottom-0 inset-x-0 z-40 bg-black/80 backdrop-blur-xl border-t border-white/10 px-4 py-2">
   <div className="max-w-5xl mx-auto flex items-center gap-3">
    <button onClick={()=>setOpen(true)} className="flex items-center gap-3 flex-1 min-w-0 text-left"><Art s={cur} cls="w-12 h-12 rounded-lg !text-xl"/>

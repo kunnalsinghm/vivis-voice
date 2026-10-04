@@ -8,7 +8,7 @@ export default function Home(){const {songs,loaded,recent,favs,play}=useApp();co
  if(loaded&&!songs.length)return <div className="text-center py-32 space-y-4"><h1 className="font-serif text-4xl">Vivi’s voice is waiting here.</h1>
   <p className="text-white/60">Upload her first recording to begin.</p><a href="/admin" className="btn inline-block">Upload Recording</a></div>
  return <div className="space-y-12">
-  <header className="fade text-center pt-6 space-y-3"><h1 className="font-serif text-5xl md:text-7xl tracking-wide">VIVI’S VOICE</h1>
+  <header className="fade text-center pt-6 space-y-3"><h1 className="font-serif text-4xl md:text-7xl tracking-normal">VIVI’S VOICE</h1>
    <p className="text-amber-200/80 italic text-lg">{cfg.tagline}</p></header>
   {songs[0]&&<section className="rounded-3xl bg-white/5 p-5 md:p-8 flex flex-col md:flex-row gap-6 items-center fade">
    {cfg.photo?<img src={cfg.photo} className="w-56 h-56 rounded-2xl object-cover"/>:<Art s={songs[songs.length-1]} cls="w-56 h-56 rounded-2xl"/>}
